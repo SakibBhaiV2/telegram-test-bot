@@ -1,45 +1,53 @@
-const { Pool } = require('pg');
+const mongoose = require('mongoose');
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false } // Render PostgreSQL-এর জন্য
+// আপনার MongoDB URL
+const MONGO_URI = "mongodb+srv://mdsakibhosen1219_db_user:FnNwf6EBidZKadlw@cluster0.lqo8wfr.mongodb.net/telegram_bot?retryWrites=true&w=majority";
+
+// স্কিমা ডিফাইন করা
+const ButtonSchema = new mongoose.Schema({
+  label: String,
+  callback_data: { type: String, unique: true },
+  style: { type: String, default: 'primary' },
+  emoji: String,
+  enabled: { type: Boolean, default: true }
 });
 
-// টেবিল তৈরি (প্রথমবার রান হলে)
-async function initDB() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS bot_config (
-      id SERIAL PRIMARY KEY,
-      bot_token TEXT NOT NULL,
-      welcome_message TEXT DEFAULT '🎮 স্বাগতম! নিচের মজার গেমগুলো ট্রাই করুন:',
-      created_at TIMESTAMP DEFAULT NOW()
-    );
-    CREATE TABLE IF NOT EXISTS buttons (
-      id SERIAL PRIMARY KEY,
-      label TEXT NOT NULL,
-      callback_data TEXT NOT NULL UNIQUE,
-      style TEXT DEFAULT 'primary',
-      emoji TEXT DEFAULT '🎮',
-      enabled BOOLEAN DEFAULT TRUE
-    );
-  `);
+const BotConfigSchema = new mongoose.Schema({
+  botToken: { type: String, default: '' },
+  welcomeMessage: { type: String, default: '🎮 স্বাগতম! নিচের মজার গেমগুলো ট্রাই করুন:' }
+});
 
-  // ডিফল্ট বাটন ইনসার্ট (যদি টেবিল খালি থাকে)
-  const res = await pool.query('SELECT COUNT(*) FROM buttons');
-  if (parseInt(res.rows[0].count) === 0) {
-    const defaultButtons = [
-      ['🎲 ডাইস রোল', 'game_dice', 'primary', '🎲'],
-      ['🎯 নাম্বার গেস', 'game_guess', 'success', '🎯'],
-      ['🪙 কয়েন টস', 'game_coin', 'primary', '🪙'],
-      ['😂 মিম', 'game_meme', 'danger', '😂'],
-    ];
-    for (const [label, cb, style, emoji] of defaultButtons) {
-      await pool.query(
-        'INSERT INTO buttons (label, callback_data, style, emoji) VALUES ($1,$2,$3,$4)',
-        [label, cb, style, emoji]
-      );
+const Button = mongoose.model('Button', ButtonSchema);
+const BotConfig = mongoose.model('BotConfig', BotConfigSchema);
+
+// ডাটাবেস কানেক্ট করার ফাংশন
+async function connectDB() {
+  try {
+    await mongoose.connect(MONGO_URI);
+    console.log('✅ MongoDB সফলভাবে কানেক্ট হয়েছে');
+    
+    // ডিফল্ট কনফিগ তৈরি
+    const configCount = await BotConfig.countDocuments();
+    if (configCount === 0) {
+      await BotConfig.create({ welcomeMessage: '🎮 স্বাগতম! নিচের মজার গেমগুলো ট্রাই করুন:' });
     }
+
+    // ডিফল্ট বাটন তৈরি
+    const btnCount = await Button.countDocuments();
+    if (btnCount === 0) {
+      const defaultButtons = [
+        { label: 'ডাইস রোল', callback_data: 'game_dice', style: 'primary', emoji: '🎲' },
+        { label: 'নাম্বার গেস', callback_data: 'game_guess', style: 'success', emoji: '🎯' },
+        { label: 'কয়েন টস', callback_data: 'game_coin', style: 'primary', emoji: '🪙' },
+        { label: 'মিম', callback_data: 'game_meme', style: 'danger', emoji: '😂' },
+      ];
+      await Button.insertMany(defaultButtons);
+    }
+    return true;
+  } catch (error) {
+    console.error('❌ MongoDB কানেকশন এরর:', error.message);
+    return false;
   }
 }
 
-module.exports = { pool, initDB };
+module.exports = { connectDB, Button, BotConfig, mongoose };

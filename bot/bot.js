@@ -1,30 +1,34 @@
-const { Telegraf, Markup } = require('telegraf');
+const { Telegraf } = require('telegraf');
 const { InlineKeyboardBuilder } = require('telegram-inline-keyboard-builder');
-const { pool } = require('../db');
+const { Button, BotConfig, mongoose } = require('../db');
 
 let botInstance = null;
 
 function createBot(token) {
-  if (botInstance) botInstance.stop('restart');
+  if (botInstance) {
+    try { botInstance.stop('restart'); } catch (e) {}
+  }
+  
   const bot = new Telegraf(token);
 
-  // /start কমান্ড
   bot.start(async (ctx) => {
-    const config = await pool.query('SELECT welcome_message FROM bot_config LIMIT 1');
-    const welcomeText = config.rows[0]?.welcome_message || '🎮 স্বাগতম!';
+    if (mongoose.connection.readyState === 0) {
+      return ctx.reply('⚠️ ডাটাবেস কানেক্টেড নেই।');
+    }
 
-    // ডেটাবেস থেকে এনাবলড বাটনগুলো নিয়ে রঙিন কিবোর্ড তৈরি
-    const btnRes = await pool.query('SELECT * FROM buttons WHERE enabled = TRUE ORDER BY id');
-    const builder = new InlineKeyboardBuilder(2); // প্রতি রো-তে ২টি বাটন
-    for (const btn of btnRes.rows) {
+    const config = await BotConfig.findOne();
+    const btnRes = await Button.find({ enabled: true }).sort({ _id: 1 });
+    
+    const builder = new InlineKeyboardBuilder(2);
+    for (const btn of btnRes) {
       builder.addCallbackButton(`${btn.emoji} ${btn.label}`, btn.callback_data, {
-        style: btn.style, // primary | success | danger
+        style: btn.style,
       });
     }
-    await ctx.reply(welcomeText, builder.build());
+    await ctx.reply(config?.welcomeMessage || '🎮 স্বাগতম!', builder.build());
   });
 
-  // গেম কলব্যাক হ্যান্ডলার
+  // গেমস
   bot.action('game_dice', async (ctx) => {
     const roll = Math.floor(Math.random() * 6) + 1;
     await ctx.answerCbQuery();
@@ -39,13 +43,9 @@ function createBot(token) {
 
   bot.action('game_meme', async (ctx) => {
     await ctx.answerCbQuery();
-    // র‍্যান্ডম মিম (placeholder – আসল মিম URL ব্যবহার করতে পারেন)
-    await ctx.replyWithPhoto('https://picsum.photos/400/300', {
-      caption: '😂 আজকের মিম!',
-    });
+    await ctx.replyWithPhoto('https://picsum.photos/400/300', { caption: '😂 আজকের মিম!' });
   });
 
-  // নাম্বার গেস (সহজ ইন্টারঅ্যাকশন)
   const guesses = new Map();
   bot.action('game_guess', async (ctx) => {
     const target = Math.floor(Math.random() * 100) + 1;

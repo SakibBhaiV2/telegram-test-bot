@@ -1,38 +1,36 @@
 const express = require('express');
 const router = express.Router();
-const { pool } = require('../db');
+const { Button, BotConfig, mongoose } = require('../db');
 const { createBot } = require('../bot/bot');
 
-// বট টোকেন সেভ ও বট চালু
+// ১. বট টোকেন সেভ এবং বট চালু
 router.post('/config/token', async (req, res) => {
   const { token } = req.body;
   if (!token) return res.status(400).json({ error: 'টোকেন দিন' });
-  await pool.query('DELETE FROM bot_config');
-  await pool.query('INSERT INTO bot_config (bot_token) VALUES ($1)', [token]);
-  createBot(token); // নতুন টোকেনে বট রিস্টার্ট
-  res.json({ success: true, message: 'বট চালু হয়েছে!' });
+
+  await BotConfig.findOneAndUpdate({}, { botToken: token }, { upsert: true });
+  createBot(token); // নতুন টোকেনে বট চালু
+  res.json({ success: true, message: 'বট সফলভাবে চালু হয়েছে!' });
 });
 
-// স্বাগত মেসেজ আপডেট
+// ২. স্বাগত মেসেজ আপডেট
 router.post('/config/message', async (req, res) => {
   const { message } = req.body;
-  await pool.query('UPDATE bot_config SET welcome_message = $1', [message]);
+  await BotConfig.findOneAndUpdate({}, { welcomeMessage: message }, { upsert: true });
   res.json({ success: true });
 });
 
-// সব বাটন লিস্ট
+// ৩. সব বাটন লিস্ট
 router.get('/buttons', async (req, res) => {
-  const result = await pool.query('SELECT * FROM buttons ORDER BY id');
-  res.json(result.rows);
+  if (mongoose.connection.readyState === 0) return res.json([]);
+  const buttons = await Button.find().sort({ _id: 1 });
+  res.json(buttons);
 });
 
-// বাটন আপডেট
+// ৪. বাটন আপডেট
 router.put('/buttons/:id', async (req, res) => {
   const { label, style, emoji, enabled } = req.body;
-  await pool.query(
-    'UPDATE buttons SET label=$1, style=$2, emoji=$3, enabled=$4 WHERE id=$5',
-    [label, style, emoji, enabled, req.params.id]
-  );
+  await Button.findByIdAndUpdate(req.params.id, { label, style, emoji, enabled });
   res.json({ success: true });
 });
 

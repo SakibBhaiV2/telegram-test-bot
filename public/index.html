@@ -18,10 +18,6 @@
     .btn-small { padding: 6px 12px; font-size: 14px; }
     table { width: 100%; border-collapse: collapse; margin-top: 12px; }
     th, td { text-align: left; padding: 8px; border-bottom: 1px solid #334155; }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
-    .badge-primary { background: var(--primary); }
-    .badge-success { background: var(--success); }
-    .badge-danger { background: var(--danger); }
   </style>
 </head>
 <body>
@@ -58,41 +54,45 @@
   <script>
     const API = '/api';
 
-    // বাটন লোড
     async function loadButtons() {
-      const res = await fetch(`${API}/buttons`);
-      const buttons = await res.json();
-      document.getElementById('buttonsTable').innerHTML = buttons.map(b => `
-        <tr>
-          <td><input value="${b.emoji}" style="width:50px" onchange="updateBtn(${b.id},'emoji',this.value)"></td>
-          <td><input value="${b.label}" onchange="updateBtn(${b.id},'label',this.value)"></td>
-          <td>
-            <select onchange="updateBtn(${b.id},'style',this.value)">
-              <option value="primary" ${b.style==='primary'?'selected':''}>🔵 নীল</option>
-              <option value="success" ${b.style==='success'?'selected':''}>🟢 সবুজ</option>
-              <option value="danger" ${b.style==='danger'?'selected':''}>🔴 লাল</option>
-            </select>
-          </td>
-          <td>${b.enabled ? '✅ এনাবল' : '❌ ডিজেবল'}</td>
-          <td>
-            <button class="btn-small ${b.enabled?'btn-danger':'btn-success'}"
-              onclick="toggleBtn(${b.id},${!b.enabled})">
-              ${b.enabled?'ডিজেবল':'এনাবল'}
-            </button>
-          </td>
-        </tr>
-      `).join('');
+      try {
+        const res = await fetch(`${API}/buttons`);
+        const buttons = await res.json();
+        document.getElementById('buttonsTable').innerHTML = buttons.map(b => `
+          <tr>
+            <td><input value="${b.emoji}" style="width:50px" onchange="updateBtn('${b._id}','emoji',this.value)"></td>
+            <td><input value="${b.label}" onchange="updateBtn('${b._id}','label',this.value)"></td>
+            <td>
+              <select onchange="updateBtn('${b._id}','style',this.value)">
+                <option value="primary" ${b.style==='primary'?'selected':''}>🔵 নীল</option>
+                <option value="success" ${b.style==='success'?'selected':''}>🟢 সবুজ</option>
+                <option value="danger" ${b.style==='danger'?'selected':''}>🔴 লাল</option>
+              </select>
+            </td>
+            <td>${b.enabled ? '✅ এনাবল' : '❌ ডিজেবল'}</td>
+            <td>
+              <button class="btn-small ${b.enabled?'btn-danger':'btn-success'}"
+                onclick="toggleBtn('${b._id}',${!b.enabled})">
+                ${b.enabled?'ডিজেবল':'এনাবল'}
+              </button>
+            </td>
+          </tr>
+        `).join('');
+      } catch (e) { console.log(e); }
     }
 
     async function saveToken() {
       const token = document.getElementById('botToken').value.trim();
+      const status = document.getElementById('tokenStatus');
+      status.innerText = 'চালু হচ্ছে...';
+      
       const res = await fetch(`${API}/config/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token })
       });
       const data = await res.json();
-      document.getElementById('tokenStatus').innerText = data.message || data.error;
+      status.innerText = data.message || data.error;
     }
 
     async function saveMessage() {
@@ -106,9 +106,11 @@
     }
 
     async function updateBtn(id, field, value) {
-      const res = await fetch(`${API}/buttons/${id}`);
-      const btn = await res.json();
+      const res = await fetch(`${API}/buttons`);
+      const buttons = await res.json();
+      const btn = buttons.find(b => b._id === id);
       const updated = { ...btn, [field]: value };
+      
       await fetch(`${API}/buttons/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -118,8 +120,10 @@
     }
 
     async function toggleBtn(id, enabled) {
-      const res = await fetch(`${API}/buttons/${id}`);
-      const btn = await res.json();
+      const res = await fetch(`${API}/buttons`);
+      const buttons = await res.json();
+      const btn = buttons.find(b => b._id === id);
+      
       await fetch(`${API}/buttons/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -128,6 +132,7 @@
       loadButtons();
     }
 
+    // পেজ লোড হলে বাটনগুলো নিয়ে আসবে
     loadButtons();
   </script>
 </body>

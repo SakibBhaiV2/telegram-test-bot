@@ -1,6 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const { initDB } = require('./db');
+const { connectDB, BotConfig } = require('./db');
 const apiRoutes = require('./routes/api');
 const { createBot } = require('./bot/bot');
 
@@ -13,13 +13,15 @@ app.use('/api', apiRoutes);
 const PORT = process.env.PORT || 3000;
 
 async function start() {
-  await initDB();
+  // ১. প্রথমে ডাটাবেস কানেক্ট হবে
+  await connectDB();
 
-  // ডেটাবেসে সেভ করা টোকেন থাকলে বট অটো-স্টার্ট
-  const { pool } = require('./db');
-  const config = await pool.query('SELECT bot_token FROM bot_config LIMIT 1');
-  if (config.rows[0]?.bot_token) {
-    createBot(config.rows[0].bot_token);
+  // ২. ডাটাবেস থেকে বট টোকেন খোঁজা হবে
+  const config = await BotConfig.findOne();
+  if (config && config.botToken) {
+    createBot(config.botToken); // টোকেন থাকলে বট চালু হবে
+  } else {
+    console.log('⚠️ বট টোকেন সেট করা নেই। অ্যাডমিন প্যানেল থেকে সেট করুন।');
   }
 
   app.listen(PORT, () => console.log(`🌐 সার্ভার চলছে: http://localhost:${PORT}`));
