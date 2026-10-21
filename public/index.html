@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🤖 বট অ্যাডমিন প্যানেল</title>
+  <style>
+    :root { --primary: #007bff; --success: #28a745; --danger: #dc3545; }
+    body { font-family: sans-serif; background: #0f172a; color: #e2e8f0; margin: 0; padding: 20px; }
+    .container { max-width: 800px; margin: auto; }
+    .card { background: #1e293b; border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+    h2 { margin-top: 0; color: #38bdf8; }
+    input, textarea, select { width: 100%; padding: 10px; margin: 6px 0 12px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #e2e8f0; box-sizing: border-box; }
+    button { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: white; }
+    .btn-primary { background: var(--primary); }
+    .btn-success { background: var(--success); }
+    .btn-danger { background: var(--danger); }
+    .btn-small { padding: 6px 12px; font-size: 14px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { text-align: left; padding: 8px; border-bottom: 1px solid #334155; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+    .badge-primary { background: var(--primary); }
+    .badge-success { background: var(--success); }
+    .badge-danger { background: var(--danger); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🤖 টেলিগ্রাম বট অ্যাডমিন প্যানেল</h1>
+
+    <!-- বট টোকেন -->
+    <div class="card">
+      <h2>🔑 বট টোকেন</h2>
+      <input type="password" id="botToken" placeholder="BotFather থেকে পাওয়া টোকেন" />
+      <button class="btn-primary" onclick="saveToken()">সেভ ও বট চালু করুন</button>
+      <p id="tokenStatus" style="color: #22c55e;"></p>
+    </div>
+
+    <!-- স্বাগত মেসেজ -->
+    <div class="card">
+      <h2>💬 স্বাগত মেসেজ</h2>
+      <textarea id="welcomeMsg" rows="3"></textarea>
+      <button class="btn-success" onclick="saveMessage()">মেসেজ আপডেট</button>
+    </div>
+
+    <!-- বাটন কনফিগারেশন -->
+    <div class="card">
+      <h2>🎛️ বাটন কনফিগারেশন</h2>
+      <table>
+        <thead>
+          <tr><th>ইমোজি</th><th>লেবেল</th><th>স্টাইল</th><th>স্ট্যাটাস</th><th>অ্যাকশন</th></tr>
+        </thead>
+        <tbody id="buttonsTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const API = '/api';
+
+    // বাটন লোড
+    async function loadButtons() {
+      const res = await fetch(`${API}/buttons`);
+      const buttons = await res.json();
+      document.getElementById('buttonsTable').innerHTML = buttons.map(b => `
+        <tr>
+          <td><input value="${b.emoji}" style="width:50px" onchange="updateBtn(${b.id},'emoji',this.value)"></td>
+          <td><input value="${b.label}" onchange="updateBtn(${b.id},'label',this.value)"></td>
+          <td>
+            <select onchange="updateBtn(${b.id},'style',this.value)">
+              <option value="primary" ${b.style==='primary'?'selected':''}>🔵 নীল</option>
+              <option value="success" ${b.style==='success'?'selected':''}>🟢 সবুজ</option>
+              <option value="danger" ${b.style==='danger'?'selected':''}>🔴 লাল</option>
+            </select>
+          </td>
+          <td>${b.enabled ? '✅ এনাবল' : '❌ ডিজেবল'}</td>
+          <td>
+            <button class="btn-small ${b.enabled?'btn-danger':'btn-success'}"
+              onclick="toggleBtn(${b.id},${!b.enabled})">
+              ${b.enabled?'ডিজেবল':'এনাবল'}
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function saveToken() {
+      const token = document.getElementById('botToken').value.trim();
+      const res = await fetch(`${API}/config/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token })
+      });
+      const data = await res.json();
+      document.getElementById('tokenStatus').innerText = data.message || data.error;
+    }
+
+    async function saveMessage() {
+      const message = document.getElementById('welcomeMsg').value;
+      await fetch(`${API}/config/message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message })
+      });
+      alert('✅ মেসেজ আপডেট হয়েছে');
+    }
+
+    async function updateBtn(id, field, value) {
+      const res = await fetch(`${API}/buttons/${id}`);
+      const btn = await res.json();
+      const updated = { ...btn, [field]: value };
+      await fetch(`${API}/buttons/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated)
+      });
+      loadButtons();
+    }
+
+    async function toggleBtn(id, enabled) {
+      const res = await fetch(`${API}/buttons/${id}`);
+      const btn = await res.json();
+      await fetch(`${API}/buttons/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...btn, enabled })
+      });
+      loadButtons();
+    }
+
+    loadButtons();
+  </script>
+</body>
+</html>
